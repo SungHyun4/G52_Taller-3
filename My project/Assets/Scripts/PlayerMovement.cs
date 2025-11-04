@@ -6,13 +6,20 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(CharacterController))]
 public class PlayerMovement : MonoBehaviour
 {
-    public float moveSpeed = 5f; // Velocidad de movimiento
-    public float rotationSpeed = 100f; // Velocidad de rotación
-    public float gravity = -9.81f; // Gravedad aplicada al personaje
-    public Camera mouseOrbitCamera; // Cámara orbital para referencia
+    [Header("Movimiento")]
+    public float moveSpeed = 5f;
+    public float rotationSpeed = 100f;
+
+    [Header("Física")]
+    public float gravity = -9.81f;
+    public float fallYLimit = 0f; // Altura a la que se considera una caída
+
+    [Header("Referencia de cámara")]
+    public Camera mouseOrbitCamera;
 
     private CharacterController controller;
     private Vector3 velocity;
+    private Transform currentCheckpoint; // Último checkpoint activado
 
     private void Start()
     {
@@ -22,68 +29,23 @@ public class PlayerMovement : MonoBehaviour
     private void Update()
     {
         MoveAndRotate();
+        ApplyGravity();
+        CheckFall();
     }
 
     private void MoveAndRotate()
     {
-        //    // Entrada de movimiento (W y S para adelante y atrás)
-        //    float vertical = Input.GetAxis("Vertical"); // Movimiento adelante/atrás
-
-        //    // Entrada de rotación (A y D para girar)
-        //    float horizontal = Input.GetAxis("Horizontal"); // Rotación izquierda/derecha
-
-        //    // Determinar la dirección según la cámara activa
-        //    Vector3 moveDirection = Vector3.zero;
-
-        //    if (mouseOrbitCamera != null && mouseOrbitCamera.gameObject.activeSelf) // Si la cámara orbital está activa
-        //    {
-        //        // Usar la dirección de la cámara orbital
-        //        Vector3 forward = mouseOrbitCamera.transform.forward;
-        //        forward.y = 0; // Ignorar la inclinación vertical
-        //        forward.Normalize();
-        //        moveDirection = forward * vertical;
-        //    }
-        //    else
-        //    {
-        //        // Usar la dirección del jugador
-        //        moveDirection = transform.forward * vertical;
-
-        //        // Rotar al personaje con A y D
-        //        if (horizontal != 0)
-        //        {
-        //            float rotation = horizontal * rotationSpeed * Time.deltaTime;
-        //            transform.Rotate(0, rotation, 0);
-        //        }
-        //    }
-
-        //    // Mover al personaje
-        //    controller.Move(moveDirection * moveSpeed * Time.deltaTime);
-
-        //    // Aplicar gravedad
-        //    if (!controller.isGrounded)
-        //    {
-        //        velocity.y += gravity * Time.deltaTime;
-        //        controller.Move(velocity * Time.deltaTime);
-        //    }
-        //    else
-        //    {
-        //        velocity.y = 0; // Reiniciar la velocidad vertical si está en el suelo
-        //    }
-
-
-        var keyboard = Keyboard.current; // Nuevo sistema
+        var keyboard = Keyboard.current;
         if (keyboard == null) return;
 
         float vertical = 0f;
         float horizontal = 0f;
 
-        // Movimiento adelante/atrás (W/S o flechas)
         if (keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed)
             vertical = 1f;
         else if (keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed)
             vertical = -1f;
 
-        // Rotación izquierda/derecha (A/D o flechas)
         if (keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed)
             horizontal = -1f;
         else if (keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed)
@@ -91,7 +53,7 @@ public class PlayerMovement : MonoBehaviour
 
         Vector3 moveDirection = Vector3.zero;
 
-        // Si la cámara orbital está activa
+        // Movimiento según cámara o personaje
         if (mouseOrbitCamera != null && mouseOrbitCamera.gameObject.activeSelf)
         {
             Vector3 forward = mouseOrbitCamera.transform.forward;
@@ -111,16 +73,55 @@ public class PlayerMovement : MonoBehaviour
         }
 
         controller.Move(moveDirection * moveSpeed * Time.deltaTime);
+    }
 
-        // Aplicar gravedad
+    private void ApplyGravity()
+    {
         if (!controller.isGrounded)
         {
             velocity.y += gravity * Time.deltaTime;
-            controller.Move(velocity * Time.deltaTime);
         }
-        else
+        else if (velocity.y < 0f)
         {
-            velocity.y = 0;
+            velocity.y = -2f;
         }
+
+        controller.Move(velocity * Time.deltaTime);
+    }
+
+    // ======================
+    //  DETECCIÓN DE CAÍDA
+    // ======================
+    private void CheckFall()
+    {
+        if (transform.position.y < fallYLimit)
+        {
+            RespawnAtCheckpoint();
+        }
+    }
+
+    // ==========================
+    //  CHECKPOINT / RESPAWN
+    // ==========================
+    public void SetCheckpoint(Transform newCheckpoint)
+    {
+        currentCheckpoint = newCheckpoint;
+    }
+
+    private void RespawnAtCheckpoint()
+    {
+        controller.enabled = false;
+
+        Vector3 respawnPos = currentCheckpoint != null
+            ? currentCheckpoint.position + Vector3.up * 1f
+            : new Vector3(0, 2f, 0); // Si no hay checkpoint, reaparece en el inicio
+
+        transform.position = respawnPos;
+        velocity = Vector3.zero;
+
+        controller.enabled = true;
+
+        if (GameManager.Instance != null)
+            GameManager.Instance.AddFall();
     }
 }
