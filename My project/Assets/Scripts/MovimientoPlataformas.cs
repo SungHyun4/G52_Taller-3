@@ -2,56 +2,82 @@ using UnityEngine;
 
 public class MovingPlatform : MonoBehaviour
 {
-    [Header("Movimiento")]
-    public float moveDistance = 3f;     // cuánto sube desde su posición inicial
-    public float moveSpeed = 2f;        // qué tan rápido sube/baja
-    public float waitTime = 0.5f;       // cuánto espera arriba/abajo
+    [Header("Distancias de movimiento")]
+    [Tooltip("Distancia máxima que se moverá verticalmente (Y). 0 = sin movimiento vertical.")]
+    public float verticalDistance = 3f;
+
+    [Tooltip("Distancia máxima que se moverá horizontalmente (X). 0 = sin movimiento horizontal.")]
+    public float horizontalDistance = 0f;
+
+    [Header("Velocidades de movimiento")]
+    [Tooltip("Velocidad vertical (arriba y abajo). 0 = sin movimiento vertical.")]
+    public float verticalSpeed = 2f;
+
+    [Tooltip("Velocidad horizontal (izquierda y derecha). 0 = sin movimiento horizontal.")]
+    public float horizontalSpeed = 0f;
+
+    [Header("Tiempo de espera en extremos")]
+    public float waitTime = 0.5f;
 
     private Vector3 startPos;
-    private Vector3 targetPos;
     private bool goingUp = true;
+    private bool goingRight = true;
     private float waitCounter = 0f;
 
     private void Start()
     {
         startPos = transform.position;
-        targetPos = startPos + Vector3.up * moveDistance;
     }
 
     private void Update()
     {
-        // si está esperando, contamos y no nos movemos
         if (waitCounter > 0f)
         {
             waitCounter -= Time.deltaTime;
             return;
         }
 
-        Vector3 goal = goingUp ? targetPos : startPos;
-        transform.position = Vector3.MoveTowards(transform.position, goal, moveSpeed * Time.deltaTime);
+        Vector3 pos = transform.position;
 
-        // ¿llegamos?
-        if (Vector3.Distance(transform.position, goal) < 0.01f)
+        // --- Movimiento vertical ---
+        if (verticalDistance != 0f && verticalSpeed != 0f)
         {
-            goingUp = !goingUp;
-            waitCounter = waitTime;
+            float targetY = startPos.y + (goingUp ? verticalDistance : 0);
+            pos.y = Mathf.MoveTowards(pos.y, targetY, verticalSpeed * Time.deltaTime);
+
+            if (Mathf.Abs(pos.y - targetY) < 0.01f)
+            {
+                goingUp = !goingUp;
+                waitCounter = waitTime;
+            }
         }
+
+        // --- Movimiento horizontal ---
+        if (horizontalDistance != 0f && horizontalSpeed != 0f)
+        {
+            float targetX = startPos.x + (goingRight ? horizontalDistance : 0);
+            pos.x = Mathf.MoveTowards(pos.x, targetX, horizontalSpeed * Time.deltaTime);
+
+            if (Mathf.Abs(pos.x - targetX) < 0.01f)
+            {
+                goingRight = !goingRight;
+                waitCounter = waitTime;
+            }
+        }
+
+        transform.position = pos;
     }
 
-    // esto es para que luego el player viaje con la plataforma
+    // Para que el jugador viaje con la plataforma
     private void OnTriggerEnter(Collider other)
     {
         if (other.CompareTag("Player"))
-        {
             other.transform.SetParent(transform);
-        }
     }
 
     private void OnTriggerExit(Collider other)
     {
         if (other.CompareTag("Player"))
-        {
             other.transform.SetParent(null);
-        }
     }
 }
