@@ -9,24 +9,29 @@ public class Checkpoint : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (activated) return;
         if (!other.CompareTag("Player")) return;
 
         PlayerMovement player = other.GetComponent<PlayerMovement>();
         if (player != null)
         {
+            // siempre actualizar al último checkpoint
             player.SetCheckpoint(transform);
-            activated = true;
 
-            if (activateEffect != null)
+            // efectos solo la primera vez
+            if (!activated)
             {
-                ParticleSystem ps = Instantiate(activateEffect, transform.position, Quaternion.identity);
-                ps.Play();
-                Destroy(ps.gameObject, 2f);
-            }
+                activated = true;
 
-            if (activateSound != null)
-                AudioSource.PlayClipAtPoint(activateSound, transform.position);
+                if (activateEffect != null)
+                {
+                    ParticleSystem ps = Instantiate(activateEffect, transform.position, Quaternion.identity);
+                    ps.Play();
+                    Destroy(ps.gameObject, 2f);
+                }
+
+                if (activateSound != null)
+                    AudioSource.PlayClipAtPoint(activateSound, transform.position);
+            }
         }
     }
 }

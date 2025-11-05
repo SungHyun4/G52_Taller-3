@@ -1,4 +1,4 @@
-using System.Collections;
+锘縰sing System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -6,31 +6,53 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(CharacterController))]
 public class PlayerMovement : MonoBehaviour
 {
-    [Header("Movimiento")]
-    public float moveSpeed = 5f;
-    public float rotationSpeed = 100f;
-
-    [Header("F韘ica")]
-    public float gravity = -9.81f;
-    public float fallYLimit = 0f; // Altura a la que se considera una ca韉a
-
-    [Header("Referencia de c醡ara")]
-    public Camera mouseOrbitCamera;
+    public float moveSpeed = 5f; // Velocidad de movimiento
+    public float rotationSpeed = 100f; // Velocidad de rotaci贸n
+    public float gravity = -9.81f; // Gravedad aplicada al personaje
+    public float jumpForce = 5f;   // Fuerza del salto
+    public Camera mouseOrbitCamera; // C谩mara orbital para referencia
 
     private CharacterController controller;
     private Vector3 velocity;
-    private Transform currentCheckpoint; // 趌timo checkpoint activado
+
+    // ANIMACI脫N
+    private Animator anim;
+    private static readonly int VelX = Animator.StringToHash("velX");
+    private static readonly int VelY = Animator.StringToHash("velY");
+    [SerializeField] private float animDamp = 0.05f;
+    private float velXCur;
+    private float velYCur;
+
+    // --- NUEVO: checkpoint din谩mico ---
+    private Transform currentCheckpoint;
+
+    // Input System (para PlayerInput)
+    private Vector2 moveInput;
+    public void OnMove(InputAction.CallbackContext ctx)
+    {
+        moveInput = ctx.ReadValue<Vector2>();
+    }
 
     private void Start()
     {
         controller = GetComponent<CharacterController>();
+        anim = GetComponent<Animator>();
+
+        // crear un checkpoint inicial invisible
+        GameObject initialCheckpoint = new GameObject("InitialCheckpoint");
+        initialCheckpoint.transform.position = transform.position;
+        currentCheckpoint = initialCheckpoint.transform;
     }
 
     private void Update()
     {
         MoveAndRotate();
-        ApplyGravity();
-        CheckFall();
+
+        // reaparecer si cae
+        if (transform.position.y < 0f)
+        {
+            RespawnAtCheckpoint();
+        }
     }
 
     private void MoveAndRotate()
@@ -41,11 +63,13 @@ public class PlayerMovement : MonoBehaviour
         float vertical = 0f;
         float horizontal = 0f;
 
+        // Movimiento adelante/atr谩s
         if (keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed)
             vertical = 1f;
         else if (keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed)
             vertical = -1f;
 
+        // Rotaci贸n izquierda/derecha
         if (keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed)
             horizontal = -1f;
         else if (keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed)
@@ -53,7 +77,7 @@ public class PlayerMovement : MonoBehaviour
 
         Vector3 moveDirection = Vector3.zero;
 
-        // Movimiento seg鷑 c醡ara o personaje
+        // Movimiento relativo a c谩mara
         if (mouseOrbitCamera != null && mouseOrbitCamera.gameObject.activeSelf)
         {
             Vector3 forward = mouseOrbitCamera.transform.forward;
@@ -73,55 +97,51 @@ public class PlayerMovement : MonoBehaviour
         }
 
         controller.Move(moveDirection * moveSpeed * Time.deltaTime);
-    }
 
-    private void ApplyGravity()
-    {
-        if (!controller.isGrounded)
+        // SALTO (manteniendo tu versi贸n)
+        if (keyboard.spaceKey.wasPressedThisFrame)
         {
-            velocity.y += gravity * Time.deltaTime;
-        }
-        else if (velocity.y < 0f)
-        {
-            velocity.y = -2f;
+            velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity);
         }
 
+        // Aplicar gravedad
+        velocity.y += gravity * Time.deltaTime;
         controller.Move(velocity * Time.deltaTime);
-    }
 
-    // ======================
-    //  DETECCI覰 DE CA虳A
-    // ======================
-    private void CheckFall()
-    {
-        if (transform.position.y < fallYLimit)
+        // ANIMACI脫N
+        if (anim != null)
         {
-            RespawnAtCheckpoint();
+            float targetVelX = 0f;
+
+            if (mouseOrbitCamera != null && mouseOrbitCamera.gameObject.activeSelf)
+            {
+                targetVelX = horizontal;
+            }
+
+            float targetVelY = vertical;
+
+            velXCur = Mathf.Lerp(velXCur, targetVelX, 1f - Mathf.Exp(-Time.deltaTime / animDamp));
+            velYCur = Mathf.Lerp(velYCur, targetVelY, 1f - Mathf.Exp(-Time.deltaTime / animDamp));
+
+            anim.SetFloat(VelX, velXCur);
+            anim.SetFloat(VelY, velYCur);
         }
     }
 
-    // ==========================
-    //  CHECKPOINT / RESPAWN
-    // ==========================
+    // --- NUEVOS M脡TODOS DE CHECKPOINT ---
     public void SetCheckpoint(Transform newCheckpoint)
     {
         currentCheckpoint = newCheckpoint;
     }
 
-    private void RespawnAtCheckpoint()
+    public void RespawnAtCheckpoint()
     {
+        if (currentCheckpoint == null) return;
+
         controller.enabled = false;
-
-        Vector3 respawnPos = currentCheckpoint != null
-            ? currentCheckpoint.position + Vector3.up * 1f
-            : new Vector3(0, 2f, 0); // Si no hay checkpoint, reaparece en el inicio
-
-        transform.position = respawnPos;
-        velocity = Vector3.zero;
-
+        transform.position = currentCheckpoint.position; // posici贸n actual del checkpoint
         controller.enabled = true;
 
-        if (GameManager.Instance != null)
-            GameManager.Instance.AddFall();
+        velocity = Vector3.zero;
     }
 }
