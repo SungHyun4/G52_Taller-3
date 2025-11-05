@@ -23,10 +23,10 @@ public class PlayerMovement : MonoBehaviour
     private float velXCur;
     private float velYCur;
 
-    // --- NUEVO: checkpoint dinámico ---
+    // checkpoint dinámico
     private Transform currentCheckpoint;
 
-    // Input System (para PlayerInput)
+    // PlayerInput (para que no dé error)
     private Vector2 moveInput;
     public void OnMove(InputAction.CallbackContext ctx)
     {
@@ -48,9 +48,14 @@ public class PlayerMovement : MonoBehaviour
     {
         MoveAndRotate();
 
-        // reaparecer si cae
-        if (transform.position.y < 0f)
+        // detectar caída
+        if (transform.position.y <= 0f)
         {
+            // contar la caída en el GameManager
+            if (GameManager.Instance != null)
+                GameManager.Instance.AddFall();
+
+            // volver al último checkpoint
             RespawnAtCheckpoint();
         }
     }
@@ -63,13 +68,13 @@ public class PlayerMovement : MonoBehaviour
         float vertical = 0f;
         float horizontal = 0f;
 
-        // Movimiento adelante/atrás
+        // Movimiento adelante/atrás (W/S o flechas)
         if (keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed)
             vertical = 1f;
         else if (keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed)
             vertical = -1f;
 
-        // Rotación izquierda/derecha
+        // Rotación izquierda/derecha (A/D o flechas)
         if (keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed)
             horizontal = -1f;
         else if (keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed)
@@ -77,7 +82,7 @@ public class PlayerMovement : MonoBehaviour
 
         Vector3 moveDirection = Vector3.zero;
 
-        // Movimiento relativo a cámara
+        // Si la cámara orbital está activa
         if (mouseOrbitCamera != null && mouseOrbitCamera.gameObject.activeSelf)
         {
             Vector3 forward = mouseOrbitCamera.transform.forward;
@@ -98,13 +103,13 @@ public class PlayerMovement : MonoBehaviour
 
         controller.Move(moveDirection * moveSpeed * Time.deltaTime);
 
-        // SALTO (manteniendo tu versión)
+        // salto sin grounded (como lo pediste)
         if (keyboard.spaceKey.wasPressedThisFrame)
         {
             velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity);
         }
 
-        // Aplicar gravedad
+        // gravedad
         velocity.y += gravity * Time.deltaTime;
         controller.Move(velocity * Time.deltaTime);
 
@@ -128,7 +133,7 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-    // --- NUEVOS MÉTODOS DE CHECKPOINT ---
+    // llamado por los checkpoints
     public void SetCheckpoint(Transform newCheckpoint)
     {
         currentCheckpoint = newCheckpoint;
@@ -139,7 +144,7 @@ public class PlayerMovement : MonoBehaviour
         if (currentCheckpoint == null) return;
 
         controller.enabled = false;
-        transform.position = currentCheckpoint.position; // posición actual del checkpoint
+        transform.position = currentCheckpoint.position;
         controller.enabled = true;
 
         velocity = Vector3.zero;
